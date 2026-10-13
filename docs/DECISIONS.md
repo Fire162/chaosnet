@@ -81,3 +81,57 @@ external dead man's switch. Fault cleanup has three layers:
   in-memory toxics, so the lab still ends up clean.
 - Assumes a single user on a local machine. Hosting experiment execution for
   other users is out of scope and requires its own security design.
+
+---
+
+## ADR-002: Local-first execution, public demo replays recorded experiments
+
+- **Status:** Accepted
+- **Date:** 2026-10-13
+
+### Context
+
+The intended product is a web application where users compose an architecture
+in a visual editor and run real experiments against it. Running experiments
+means starting containers and holding access to the Docker socket, which is
+root-equivalent on the host. Containers share the host kernel.
+
+### Problem
+
+Where does experiment execution run: on the user's machine, or on a server we
+host for anyone on the internet?
+
+### Options considered
+
+1. **Local-first.** The user clones the repository and runs the whole
+   application (UI, control plane, lab) on their own machine against
+   `localhost`. Safe and free, and measurements are real; requires Docker.
+2. **Publicly hosted execution.** Every user gets an isolated sandbox (for
+   example a Firecracker or gVisor microVM), with authentication, quotas and
+   abuse protection. Lowest friction for visitors, but this is a project of its
+   own in security and cost, and noisy neighbours distort measurements.
+3. **Hybrid.** Option 1 for running experiments, plus a public, read-only demo
+   that replays recorded results of real experiments (topology, metrics,
+   traces), clearly labelled as recordings.
+
+### Decision
+
+Option 3 as the target. Until the replay demo exists, ChaosNet is local-only.
+
+### Rationale
+
+- No untrusted user ever gets a path to the Docker socket.
+- Visitors (for example reviewers of the project) can still see real results
+  without installing anything.
+- The principle "measure real behaviour, never fabricate" holds: replays are
+  recordings of real runs, never synthesised data.
+
+### Consequences
+
+- The control plane binds to `127.0.0.1` only and has no authentication in the
+  MVP. This is acceptable only because of this decision.
+- Experiment results need a self-contained, exportable format so they can be
+  replayed by a static site. This is planned for around v0.2.
+- Option 2 remains possible later: ADR-001 keeps execution separable into an
+  agent that could run inside a per-user sandbox. It would need its own ADR and
+  security design.
