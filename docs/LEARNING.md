@@ -50,3 +50,52 @@ meant to cover.
 heartbeat every few seconds; a separate tiny watchdog resets all faults if the
 heartbeat stops. The safe state is triggered by the *absence* of a signal.
 Kubernetes and etcd use leases the same way. See ADR-001.
+
+---
+
+## 2026-10-13: Container networking is real networking
+
+**Question:** why is only the gateway port published to the host?
+
+- *My answer:* because everything runs locally, so traffic does not go through
+  the network layer. **Incorrect.**
+
+Containers talk over a real TCP/IP stack. Each container has its own network
+namespace (interfaces, IP, routing table, ARP table), connected by veth pairs to
+a Linux bridge inside the Docker VM. Even `localhost` goes through the loopback
+interface. "Local" only means the packets never leave one kernel, so the network
+is idealised (no physical loss, near-zero latency). That is why we degrade it
+artificially.
+
+Actual reasons for publishing only the gateway:
+
+1. Experiments must not be bypassable. Every request must take the path where
+   faults are injected, or measurements are wrong.
+2. It mirrors production: internal services sit behind a single entry point,
+   which keeps the attack surface small.
+3. Services find each other by name through Docker DNS (`http://inventory:8000`),
+   which is real service discovery.
+
+---
+
+## 2026-10-13: Latency is one-way; RTT is the sum of both directions
+
+From spike #12: netem `delay 100ms` on the pinging container's `eth0` gave a ping
+RTT of ~103 ms, not 200 ms. A Toxiproxy latency of 300 ms on one stream gave
+~0.30 s, and on both streams ~0.61 s.
+
+**Questions:** why not 200 ms? Why does the delay double with both streams?
+
+- *My answer 1:* because netem is RTT. **Incorrect, it is the opposite.**
+- *My answer 2:* because it gets divided. **Incorrect, the delays add up.**
+
+netem shapes **egress** only: packets *leaving* the interface it is attached to.
+The echo request left the pinging container and was delayed by 100 ms; the echo
+reply left the *other* container and was not delayed. RTT = 100 + ~0.2 ms.
+
+Toxiproxy works the same way: `upstream` delays client-to-server bytes,
+`downstream` delays server-to-client bytes. A request/response needs both
+directions, so the delays add: 300 + 300 = 600 ms.
+
+**Rule:** RTT = one-way delay there + one-way delay back. Every fault definition
+in ChaosNet must state whether a latency is one-way or round-trip.
