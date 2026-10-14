@@ -100,7 +100,6 @@ class FaultDriver:
         faults: list[Fault] = []
         for stream in streams:
             name = f"chaosnet-{kind}-{stream}"
-            attributes = attributes
             toxic = {
                 "name": name,
                 "type": kind,
