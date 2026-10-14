@@ -28,8 +28,12 @@ line-length = 100
 # E/F: pycodestyle + pyflakes, I: import order, B: likely bugs, UP: modern syntax
 select = ["E", "F", "I", "B", "UP"]
 
+[project.scripts]
+chaosnet-fault = "chaosnet.fault_cli:main"
+
 [tool.pyright]
 include = ["src", "tests"]
+extraPaths = ["tests"]
 typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]

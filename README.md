@@ -57,4 +57,15 @@ uv run python -m chaosnet.loadgen http://localhost:8080/orders --rate 20 --durat
     --body '{"item_id": "42"}'
 ```
 
+Inject a fault for a fixed time (it is always removed at the end, on Ctrl+C and on `kill`):
+
+```bash
+cd backend
+uv run chaosnet-fault latency --link orders-inventory --ms 300 --direction both --duration 60
+uv run chaosnet-fault list     # active faults
+uv run chaosnet-fault clear    # remove all faults
+```
+
+Links: `gateway-orders`, `orders-inventory`. Fault kinds: `latency`, `bandwidth`, `reset_peer`.
+
 `make integration` runs the acceptance tests against a real Compose lab (needs Docker).
